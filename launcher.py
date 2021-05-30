@@ -6,7 +6,11 @@ COEFF_GANRES = 1.0
 COEFF_TYPE = 0.5
 COEFF_DURATION = 0.1
 
-
+users_file = open("USER_UID.txt", "r")
+content = users_file.read().replace("\n","").replace(" ", "")
+USERS = content.split(",")
+users_file.close()
+print(USERS)
 raw_content = {}
 with open('content.csv', newline='', encoding='utf-8') as csvfile:
      reader = csv.DictReader(csvfile)
@@ -53,37 +57,45 @@ for i in range(len(all_films)):
         second_film_id = all_films[j]
         matrix[(first_film_id, second_film_id)] = matrix[(second_film_id, first_film_id)] = corr(first_film_id, second_film_id)
 
-for user in USERS:
-    print(f'start user {user}')
-    mini_watch = {}
-    for watched in raw_users[user]:
-        film = watched['content_uid']
-        if raw_content[film]['type'] == 'episode':
-            film = raw_content[film]['serial_id']
+with open('recommendations.csv', 'w', newline='') as csvfile:
+    fieldnames = ['user_id', 'recommendations']
+    writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
+    writer.writeheader()
 
-        if film not in raw_content:
-            continue
+    for user in USERS:
+        print(f'start user {user}')
+        mini_watch = {}
+        for watched in raw_users[user]:
+            film = watched['content_uid']
+            if raw_content[film]['type'] == 'episode':
+                film = raw_content[film]['serial_id']
 
-        if film in mini_watch:
-            mini_watch[film]['durations'].append(int(watched['second']) / int(raw_content[watched['content_uid']]['duration_seconds']))
-        else:
-            mini_watch[film] = raw_content[film]
-            mini_watch[film]['durations'] = [int(watched['second']) / int(raw_content[watched['content_uid']]['duration_seconds'])]
+            if film not in raw_content:
+                continue
 
-    all_watched = set(mini_watch.keys())
-    all_not_watched = set(mini_content.keys()) - all_watched
+            if film in mini_watch:
+                mini_watch[film]['durations'].append(int(watched['second']) / int(raw_content[watched['content_uid']]['duration_seconds']))
+            else:
+                mini_watch[film] = raw_content[film]
+                mini_watch[film]['durations'] = [int(watched['second']) / int(raw_content[watched['content_uid']]['duration_seconds'])]
 
-    recommends = {}
-    for not_watched in all_not_watched:
-        recommends[not_watched] = 0
-        for watched in all_watched:
-            recommends[not_watched] += matrix[(not_watched, watched)] * statistics.mean(mini_watch[watched]['durations'])
+        all_watched = set(mini_watch.keys())
+        all_not_watched = set(mini_content.keys()) - all_watched
 
-    recommends = dict(sorted(recommends.items(), reverse=True, key = lambda x:x[1]))
-    print(user)
-    first_keys = list(recommends.keys())[:50]
-    print()
-    print(first_keys)
-    print()
-    for k in first_keys:
-        print(k, recommends[k], mini_content[k])
+        recommends = {}
+        for not_watched in all_not_watched:
+            recommends[not_watched] = 0
+            for watched in all_watched:
+                recommends[not_watched] += matrix[(not_watched, watched)] * statistics.mean(mini_watch[watched]['durations'])
+
+        recommends = dict(sorted(recommends.items(), reverse=True, key = lambda x:x[1]))
+        print(user)
+        first_keys = list(recommends.keys())[:50]
+        print()
+        print(first_keys)
+        print()
+        for k in first_keys:
+            print(k, recommends[k], mini_content[k])
+
+
+        writer.writerow({'user_id': user, 'recommendations': ','.join(first_keys)})
